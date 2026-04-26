@@ -10,22 +10,22 @@ COPY package.json pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile
 
 COPY . .
-RUN pnpm prisma generate && \
-	pnpm build && \
-	pnpm prune --prod
+RUN pnpm prisma:generate && \
+    pnpm build && \
+    pnpm prune --prod
 
 FROM base AS runner
 WORKDIR /app
 
 RUN addgroup --system --gid 1001 nodejs && \
-	adduser --system --uid 1001 hono
+    adduser --system --uid 1001 nestjs
 
-COPY --from=builder --chown=hono:nodejs /app/node_modules /app/node_modules
-COPY --from=builder --chown=hono:nodejs /app/dist /app/dist
-COPY --from=builder --chown=hono:nodejs /app/package.json /app/package.json
-COPY --from=builder --chown=hono:nodejs /app/prisma /app/prisma
+COPY --from=builder --chown=nestjs:nodejs /app/node_modules /app/node_modules
+COPY --from=builder --chown=nestjs:nodejs /app/dist /app/dist
+COPY --from=builder --chown=nestjs:nodejs /app/package.json /app/package.json
+COPY --from=builder --chown=nestjs:nodejs /app/prisma /app/prisma
 
-USER hono
+USER nestjs
 EXPOSE 3000
 
-CMD ["node", "/app/dist/index.js"]
+CMD ["sh", "-c", "node -e \"const{execSync}=require('child_process');execSync('npx prisma migrate deploy',{stdio:'inherit'})\" && node dist/main"]

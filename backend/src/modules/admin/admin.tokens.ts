@@ -1,0 +1,2 @@
+export const ADMIN_REPOSITORY = 'ADMIN_REPOSITORY';
+export const ADMIN_SERVICE = 'ADMIN_SERVICE';
