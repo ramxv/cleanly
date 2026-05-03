@@ -6,19 +6,22 @@ RUN apk add --no-cache gcompat
 WORKDIR /app
 ENV CI=true
 
+ARG DATABASE_URL
+ENV DATABASE_URL=${DATABASE_URL}
+
 COPY package.json pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile
 
 COPY . .
 RUN pnpm prisma:generate && \
-    pnpm build && \
-    pnpm prune --prod
+	pnpm build && \
+	pnpm prune --prod
 
 FROM base AS runner
 WORKDIR /app
 
 RUN addgroup --system --gid 1001 nodejs && \
-    adduser --system --uid 1001 nestjs
+	adduser --system --uid 1001 nestjs
 
 COPY --from=builder --chown=nestjs:nodejs /app/node_modules /app/node_modules
 COPY --from=builder --chown=nestjs:nodejs /app/dist /app/dist
@@ -28,4 +31,4 @@ COPY --from=builder --chown=nestjs:nodejs /app/prisma /app/prisma
 USER nestjs
 EXPOSE 3000
 
-CMD ["sh", "-c", "node -e \"const{execSync}=require('child_process');execSync('npx prisma migrate deploy',{stdio:'inherit'})\" && node dist/main"]
+CMD ["sh", "-c", "node_modules/.bin/prisma migrate deploy && node dist/main"]

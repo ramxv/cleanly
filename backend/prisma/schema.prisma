@@ -1,240 +1,414 @@
+// Cleanly — Plataforma de Servicios de Limpieza Doméstica
+
 generator client {
-  provider        = "prisma-client-js"
-  previewFeatures = ["fullTextSearchPostgres", "metrics", "views"]
+  provider = "prisma-client-js"
 }
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
-// --- Enums --------------------------------------------------------------------
+// ─────────────────────────────────────────────────────────────────────────────
+// ENUMERACIONES
+// ─────────────────────────────────────────────────────────────────────────────
 
-enum Role {
-  CLIENT
-  WORKER
+enum Rol {
+  CLIENTE
+  TRABAJADOR
   ADMIN
 }
 
-enum VerificationStatus {
-  PENDING
-  APPROVED
-  REJECTED
+enum EstadoVerificacion {
+  PENDIENTE
+  APROBADO
+  RECHAZADO
+  SUSPENDIDO
 }
 
-enum ServiceType {
-  STANDARD
-  DEEP
-  POST_CONSTRUCTION
+enum TipoServicio {
+  ESTANDAR
+  PROFUNDA
+  POST_OBRA
 }
 
-enum BookingStatus {
-  PENDING_PAYMENT
-  CONFIRMED
-  IN_PROGRESS
-  COMPLETED
-  CANCELLED
-  DISPUTED
+enum EstadoReserva {
+  PENDIENTE_PAGO
+  CONFIRMADA
+  EN_PROGRESO
+  COMPLETADA
+  CANCELADA
+  DISPUTADA
 }
 
-enum PaymentStatus {
-  PENDING
-  CAPTURED
-  RELEASED
-  REFUNDED
-  FAILED
+enum EstadoPago {
+  PENDIENTE
+  RETENIDO
+  LIBERADO
+  REEMBOLSADO
+  FALLIDO
 }
 
-// --- Core User ----------------------------------------------------------------
-
-model User {
-  id           String    @id @default(uuid()) @db.Uuid
-  email        String    @unique @db.VarChar(255)
-  passwordHash String?   @map("password_hash") @db.VarChar(255)
-  role         Role
-  isVerified   Boolean   @default(false) @map("is_verified")
-  isSuspended  Boolean   @default(false) @map("is_suspended")
-  createdAt    DateTime  @default(now()) @map("created_at")
-  updatedAt    DateTime  @updatedAt @map("updated_at")
-  deletedAt    DateTime? @map("deleted_at")
-
-  clientProfile   ClientProfile?
-  workerProfile   WorkerProfile?
-  reviewsGiven    Review[]       @relation("ReviewFrom")
-  reviewsReceived Review[]       @relation("ReviewTo")
-
-  @@index([email])
-  @@index([role, isSuspended])
-  @@index([deletedAt])
-  @@map("users")
+enum ActorCancelacion {
+  CLIENTE
+  TRABAJADOR
+  ADMIN
 }
 
-// --- Profiles -----------------------------------------------------------------
-
-model ClientProfile {
-  id             String   @id @default(uuid()) @db.Uuid
-  userId         String   @unique @map("user_id") @db.Uuid
-  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  fullName       String   @map("full_name") @db.VarChar(255)
-  phone          String?  @db.VarChar(50)
-  loyaltyCount   Int      @default(0) @map("loyalty_count") @db.SmallInt
-  defaultAddress String?  @map("default_address") @db.Text
-  createdAt      DateTime @default(now()) @map("created_at")
-  updatedAt      DateTime @updatedAt @map("updated_at")
-
-  serviceRequests ServiceRequest[]
-  loyaltyCoupons  LoyaltyCoupon[]
-
-  @@index([userId])
-  @@map("client_profiles")
+enum DiaSemana {
+  LUNES
+  MARTES
+  MIERCOLES
+  JUEVES
+  VIERNES
+  SABADO
+  DOMINGO
 }
 
-model WorkerProfile {
-  id                 String             @id @default(uuid()) @db.Uuid
-  userId             String             @unique @map("user_id") @db.Uuid
-  user               User               @relation(fields: [userId], references: [id], onDelete: Cascade)
-  fullName           String             @map("full_name") @db.VarChar(255)
-  bio                String?            @db.Text
-  avgRating          Float              @default(0) @map("avg_rating")
-  reviewCount        Int                @default(0) @map("review_count")
-  isPremium          Boolean            @default(false) @map("is_premium")
-  serviceTypes       ServiceType[]      @map("service_types")
-  verificationStatus VerificationStatus @default(PENDING) @map("verification_status")
-  documentUrls       String[]           @map("document_urls")
-  hourlyRate         Decimal?           @db.Decimal(10, 2) @map("hourly_rate")
-  createdAt          DateTime           @default(now()) @map("created_at")
-  updatedAt          DateTime           @updatedAt @map("updated_at")
+// ─────────────────────────────────────────────────────────────────────────────
+// USUARIOS Y AUTENTICACIÓN
+// ─────────────────────────────────────────────────────────────────────────────
 
-  availability Availability[]
-  bookings     Booking[]
+model Usuario {
+  id             String   @id @default(cuid())
+  correo         String   @unique
+  contrasenaHash String
+  rol            Rol
+  activo         Boolean  @default(true)
+  creadoEn       DateTime @default(now())
+  actualizadoEn  DateTime @updatedAt
 
-  @@index([verificationStatus, isPremium, avgRating(sort: Desc)])
-  @@index([avgRating(sort: Desc), reviewCount(sort: Desc)])
-  @@map("worker_profiles")
+  perfilCliente    PerfilCliente?
+  perfilTrabajador PerfilTrabajador?
+  sesiones         Sesion[]
+
+  @@index([correo])
+  @@map("usuarios")
 }
 
-// --- Availability -------------------------------------------------------------
+model Sesion {
+  id        String   @id @default(cuid())
+  usuarioId String
+  token     String   @unique
+  expiraEn  DateTime
+  creadoEn  DateTime @default(now())
 
-model Availability {
-  id           String        @id @default(uuid()) @db.Uuid
-  workerId     String        @map("worker_id") @db.Uuid
-  worker       WorkerProfile @relation(fields: [workerId], references: [id], onDelete: Cascade)
-  dayOfWeek    Int           @map("day_of_week") @db.SmallInt
-  startTime    String        @map("start_time") @db.VarChar(5)
-  endTime      String        @map("end_time") @db.VarChar(5)
-  serviceZones String[]      @map("service_zones")
-  createdAt    DateTime      @default(now()) @map("created_at")
-  updatedAt    DateTime      @updatedAt @map("updated_at")
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
 
-  @@index([workerId, dayOfWeek])
-  @@map("worker_availabilities")
+  @@index([usuarioId])
+  @@index([token])
+  @@map("sesiones")
 }
 
-// --- Service Request ----------------------------------------------------------
+// ─────────────────────────────────────────────────────────────────────────────
+// PERFIL DE CLIENTE
+// ─────────────────────────────────────────────────────────────────────────────
 
-model ServiceRequest {
-  id           String        @id @default(uuid()) @db.Uuid
-  clientId     String        @map("client_id") @db.Uuid
-  client       ClientProfile @relation(fields: [clientId], references: [id])
-  serviceType  ServiceType   @map("service_type")
-  propertySize Float         @map("property_size")
-  bedroomCount Int           @map("bedroom_count") @db.SmallInt
-  locationArea String        @map("location_area") @db.VarChar(255)
-  scheduledAt  DateTime      @map("scheduled_at")
-  status       String        @default("OPEN") @db.VarChar(50)
-  createdAt    DateTime      @default(now()) @map("created_at")
-  updatedAt    DateTime      @updatedAt @map("updated_at")
+model PerfilCliente {
+  id        String  @id @default(cuid())
+  usuarioId String  @unique
+  nombre    String
+  telefono  String?
+  fotoUrl   String?
 
-  booking Booking?
+  contadorLealtad Int @default(0)
 
-  @@index([clientId, status])
-  @@index([status, scheduledAt(sort: Asc)]) 
-  @@index([locationArea, status])
-  @@index([createdAt(sort: Desc), id])
-  @@map("service_requests")
+  creadoEn      DateTime @default(now())
+  actualizadoEn DateTime @updatedAt
+
+  usuario          Usuario             @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  direcciones      Direccion[]
+  solicitudes      SolicitudServicio[]
+  reservas         Reserva[]
+  resenasEmitidas  Resena[]            @relation("ResenasEmitidas")
+  resenasRecibidas Resena[]            @relation("ResenasRecibidas")
+
+  @@map("perfiles_clientes")
 }
 
-// --- Booking ------------------------------------------------------------------
+model Direccion {
+  id                String  @id @default(cuid())
+  perfilClienteId   String
+  etiqueta          String
+  direccionCompleta String
+  barrio            String
+  distrito          String
+  provincia         String
+  esPredeterminada  Boolean @default(false)
 
-model Booking {
-  id               String        @id @default(uuid()) @db.Uuid
-  requestId        String        @unique @map("request_id") @db.Uuid
-  request          ServiceRequest @relation(fields: [requestId], references: [id])
-  workerId         String        @map("worker_id") @db.Uuid
-  worker           WorkerProfile @relation(fields: [workerId], references: [id])
-  exactAddress     String?       @map("exact_address") @db.Text
-  price            Decimal       @db.Decimal(10, 2)
-  status           BookingStatus @default(PENDING_PAYMENT)
-  scheduledAt      DateTime      @map("scheduled_at")
-  estimatedEndAt   DateTime?     @map("estimated_end_at")
-  cancelledBy      String?       @map("cancelled_by") @db.Uuid
-  cancellationNote String?       @map("cancellation_note") @db.Text
-  createdAt        DateTime      @default(now()) @map("created_at")
-  updatedAt        DateTime      @updatedAt @map("updated_at")
+  cliente  PerfilCliente @relation(fields: [perfilClienteId], references: [id], onDelete: Cascade)
+  reservas Reserva[]
 
-  payment Payment?
-  reviews Review[]
-
-  @@index([workerId, status, scheduledAt(sort: Asc)])
-  @@index([status, estimatedEndAt(sort: Asc)])
-  @@index([createdAt(sort: Desc), id])
-  @@map("bookings")
+  @@index([perfilClienteId])
+  @@map("direcciones")
 }
 
-// --- Payment ------------------------------------------------------------------
+// ─────────────────────────────────────────────────────────────────────────────
+// PERFIL DE TRABAJADOR
+// ─────────────────────────────────────────────────────────────────────────────
 
-model Payment {
-  id             String        @id @default(uuid()) @db.Uuid
-  bookingId      String        @unique @map("booking_id") @db.Uuid
-  booking        Booking       @relation(fields: [bookingId], references: [id])
-  amount         Decimal       @db.Decimal(10, 2)
-  commission     Decimal       @db.Decimal(10, 2)
-  netAmount      Decimal       @map("net_amount") @db.Decimal(10, 2)
-  status         PaymentStatus @default(PENDING)
-  gatewayRef     String?       @map("gateway_ref") @db.VarChar(255)
-  idempotencyKey String        @unique @map("idempotency_key") @db.VarChar(255)
-  createdAt      DateTime      @default(now()) @map("created_at")
-  updatedAt      DateTime      @updatedAt @map("updated_at")
+model PerfilTrabajador {
+  id        String  @id @default(cuid())
+  usuarioId String  @unique
+  nombre    String
+  telefono  String?
+  fotoUrl   String?
+  biografia String?
 
-  @@index([status])
-  @@index([createdAt(sort: Desc), id])
-  @@map("payments")
+  estadoVerificacion EstadoVerificacion @default(PENDIENTE)
+  verificadoEn       DateTime?
+  motivoRechazo      String?
+
+  calificacionPromedio Float @default(0)
+  totalResenas         Int   @default(0)
+
+  esPremium       Boolean   @default(false)
+  premiumExpiraEn DateTime?
+
+  tarifaPorHora Float
+
+  tiposServicio TipoServicio[]
+
+  creadoEn      DateTime @default(now())
+  actualizadoEn DateTime @updatedAt
+
+  usuario          Usuario               @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  documentos       DocumentoTrabajador[]
+  disponibilidad   Disponibilidad[]
+  zonasServicio    ZonaServicio[]
+  reservas         Reserva[]
+  resenasEmitidas  Resena[]              @relation("ResenasEmitidas")
+  resenasRecibidas Resena[]              @relation("ResenasRecibidas")
+  historialPremium SuscripcionPremium[]
+
+  @@map("perfiles_trabajadores")
 }
 
-// --- Review -------------------------------------------------------------------
+model DocumentoTrabajador {
+  id                 String    @id @default(cuid())
+  perfilTrabajadorId String
+  tipo               String
+  archivoUrl         String
+  fechaEmision       DateTime?
+  subidoEn           DateTime  @default(now())
+  revisadoEn         DateTime?
+  aprobado           Boolean?
 
-model Review {
-  id          String   @id @default(uuid()) @db.Uuid
-  bookingId   String   @map("booking_id") @db.Uuid
-  booking     Booking  @relation(fields: [bookingId], references: [id])
-  fromUserId  String   @map("from_user_id") @db.Uuid
-  fromUser    User     @relation("ReviewFrom", fields: [fromUserId], references: [id])
-  toUserId    String   @map("to_user_id") @db.Uuid
-  toUser      User     @relation("ReviewTo", fields: [toUserId], references: [id])
-  stars       Int      @db.SmallInt
-  comment     String?  @db.Text
-  isModerated Boolean  @default(false) @map("is_moderated")
-  createdAt   DateTime @default(now()) @map("created_at")
-  deletedAt   DateTime? @map("deleted_at")
+  trabajador PerfilTrabajador @relation(fields: [perfilTrabajadorId], references: [id], onDelete: Cascade)
 
-  @@unique([bookingId, fromUserId])
-  @@index([toUserId, isModerated, stars(sort: Desc)])
-  @@map("reviews")
+  @@index([perfilTrabajadorId])
+  @@map("documentos_trabajadores")
 }
 
-// --- Loyalty Coupon -----------------------------------------------------------
+model Disponibilidad {
+  id                 String    @id @default(cuid())
+  perfilTrabajadorId String
+  diaSemana          DiaSemana
+  horaInicio         String
+  horaFin            String
 
-model LoyaltyCoupon {
-  id            String        @id @default(uuid()) @db.Uuid
-  clientId      String        @map("client_id") @db.Uuid
-  client        ClientProfile @relation(fields: [clientId], references: [id])
-  value         Decimal       @db.Decimal(10, 2)
-  isUsed        Boolean       @default(false) @map("is_used")
-  expiresAt     DateTime      @map("expires_at")
-  usedAt        DateTime?     @map("used_at")
-  bookingIdUsed String?       @map("booking_id_used") @db.Uuid
-  createdAt     DateTime      @default(now()) @map("created_at")
+  trabajador PerfilTrabajador @relation(fields: [perfilTrabajadorId], references: [id], onDelete: Cascade)
 
-  @@index([clientId, isUsed, expiresAt(sort: Asc)])
-  @@map("loyalty_coupons")
+  @@unique([perfilTrabajadorId, diaSemana, horaInicio])
+  @@index([perfilTrabajadorId])
+  @@map("disponibilidades")
+}
+
+model ZonaServicio {
+  id                 String  @id @default(cuid())
+  perfilTrabajadorId String
+  provincia          String
+  distrito           String
+  barrio             String?
+
+  trabajador PerfilTrabajador @relation(fields: [perfilTrabajadorId], references: [id], onDelete: Cascade)
+
+  @@index([perfilTrabajadorId])
+  @@map("zonas_servicio")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SOLICITUDES Y RESERVAS
+// ─────────────────────────────────────────────────────────────────────────────
+
+model SolicitudServicio {
+  id              String       @id @default(cuid())
+  perfilClienteId String
+  tipoServicio    TipoServicio
+  tamanoM2        Float
+  cantidadHabDir  Int
+  cantidadBanos   Int
+  notas           String?
+  fechaHora       DateTime
+  barrio          String
+  distrito        String
+  provincia       String
+  presupuestoMax  Float?
+
+  creadoEn DateTime @default(now())
+
+  cliente PerfilCliente @relation(fields: [perfilClienteId], references: [id])
+  reserva Reserva?
+
+  @@index([perfilClienteId])
+  @@index([fechaHora])
+  @@map("solicitudes_servicio")
+}
+
+model Reserva {
+  id                 String        @id @default(cuid())
+  solicitudId        String        @unique
+  perfilClienteId    String
+  perfilTrabajadorId String
+  direccionId        String
+  estado             EstadoReserva @default(PENDIENTE_PAGO)
+
+  fechaHora        DateTime
+  duracionEstimada Int
+  precioTotal      Float
+
+  confirmadaEn DateTime?
+  iniciadaEn   DateTime?
+  completadaEn DateTime?
+  canceladaEn  DateTime?
+
+  canceladoPor      ActorCancelacion?
+  motivoCancelacion String?
+  montoPenalidad    Float?
+
+  creadoEn      DateTime @default(now())
+  actualizadoEn DateTime @updatedAt
+
+  solicitud  SolicitudServicio @relation(fields: [solicitudId], references: [id])
+  cliente    PerfilCliente     @relation(fields: [perfilClienteId], references: [id])
+  trabajador PerfilTrabajador  @relation(fields: [perfilTrabajadorId], references: [id])
+  direccion  Direccion         @relation(fields: [direccionId], references: [id])
+  pago       Pago?
+  resenas    Resena[]
+  disputa    Disputa?
+
+  @@index([perfilClienteId])
+  @@index([perfilTrabajadorId])
+  @@index([estado])
+  @@index([fechaHora])
+  @@map("reservas")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PAGOS
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Pago {
+  id        String     @id @default(cuid())
+  reservaId String     @unique
+  estado    EstadoPago @default(PENDIENTE)
+
+  monto         Float
+  tasaComision  Float
+  montoComision Float
+  montoNeto     Float
+
+  referenciaPassarela String?
+  claveIdempotencia   String  @unique
+
+  retenidoEn      DateTime?
+  liberadoEn      DateTime?
+  reembolsadoEn   DateTime?
+  motivoReembolso String?
+
+  creadoEn      DateTime @default(now())
+  actualizadoEn DateTime @updatedAt
+
+  reserva Reserva @relation(fields: [reservaId], references: [id])
+
+  @@index([estado])
+  @@index([claveIdempotencia])
+  @@map("pagos")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CALIFICACIONES Y RESEÑAS
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Resena {
+  id        String @id @default(cuid())
+  reservaId String
+
+  desdeclienteId    String?
+  desdeTrabajadorId String?
+
+  paraClienteId    String?
+  paraTrabajadorId String?
+
+  estrellas  Int
+  comentario String?
+
+  activa           Boolean   @default(true)
+  moderadaEn       DateTime?
+  motivoModeracion String?
+
+  creadoEn DateTime @default(now())
+
+  reserva         Reserva           @relation(fields: [reservaId], references: [id])
+  desdeCliente    PerfilCliente?    @relation("ResenasEmitidas", fields: [desdeclienteId], references: [id])
+  paraCliente     PerfilCliente?    @relation("ResenasRecibidas", fields: [paraClienteId], references: [id])
+  desdeTrabajador PerfilTrabajador? @relation("ResenasEmitidas", fields: [desdeTrabajadorId], references: [id])
+  paraTrabajador  PerfilTrabajador? @relation("ResenasRecibidas", fields: [paraTrabajadorId], references: [id])
+
+  @@index([reservaId])
+  @@index([paraTrabajadorId])
+  @@map("resenas")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PLAN PREMIUM
+// ─────────────────────────────────────────────────────────────────────────────
+
+model SuscripcionPremium {
+  id                 String  @id @default(cuid())
+  perfilTrabajadorId String
+
+  inicioEn       DateTime
+  expiraEn       DateTime
+  activa         Boolean  @default(true)
+  referenciaPago String?
+
+  trabajador PerfilTrabajador @relation(fields: [perfilTrabajadorId], references: [id])
+
+  @@index([perfilTrabajadorId])
+  @@map("suscripciones_premium")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DISPUTAS
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Disputa {
+  id          String    @id @default(cuid())
+  reservaId   String    @unique
+  abiertaPor  Rol
+  motivo      String
+  resolucion  String?
+  resueltaEn  DateTime?
+  resueltaPor String?
+
+  creadoEn      DateTime @default(now())
+  actualizadoEn DateTime @updatedAt
+
+  reserva Reserva @relation(fields: [reservaId], references: [id])
+
+  @@map("disputas")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CONFIGURACIÓN DE LA PLATAFORMA
+// ─────────────────────────────────────────────────────────────────────────────
+
+model ConfiguracionPlataforma {
+  id            String   @id @default(cuid())
+  clave         String   @unique
+  valor         String
+  descripcion   String?
+  actualizadoEn DateTime @updatedAt
+
+  @@map("configuracion_plataforma")
 }

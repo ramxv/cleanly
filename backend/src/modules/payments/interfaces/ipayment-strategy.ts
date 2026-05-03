@@ -1,8 +1,8 @@
 import type { IPaymentGateway } from '../../../infrastructure/payments/ipayment-gateway.interface';
 import type { ProcessPaymentDto } from '../dto/process-payment.dto';
-import type { PaymentTransaction } from '@prisma/client';
+import type { Payment } from '@prisma/client';
 
 export interface IPaymentStrategy {
   get providerName(): string;
-  process(dto: ProcessPaymentDto, gateway: IPaymentGateway): Promise<PaymentTransaction>;
+  process(dto: ProcessPaymentDto, gateway: IPaymentGateway): Promise<Payment>;
 }
