@@ -8,7 +8,7 @@
 
         <div class="auth__shell">
           <RouterLink to="/" class="auth__brand" aria-label="Cleanly">
-            <img src="/logo.svg" alt="Cleanly" height="36" />
+            <h1 class="auth__logo-text">✨ Cleanly</h1>
           </RouterLink>
 
           <div class="card">
@@ -21,7 +21,7 @@
 
             <q-form class="form" @submit.prevent="onSubmit">
               <q-input
-                v-model="form.correo"
+                v-model="form.email"
                 type="email"
                 label="Correo electrónico"
                 stack-label
@@ -37,7 +37,7 @@
               </q-input>
 
               <q-input
-                v-model="form.contrasena"
+                v-model="form.password"
                 :type="showPassword ? 'text' : 'password'"
                 label="Contraseña"
                 stack-label
@@ -58,18 +58,6 @@
                   />
                 </template>
               </q-input>
-
-              <div class="form__row">
-                <q-checkbox
-                  v-model="form.recordar"
-                  label="Recordarme"
-                  color="primary"
-                  dense
-                />
-                <a href="#" class="form__link" @click.prevent>
-                  ¿Olvidaste tu contraseña?
-                </a>
-              </div>
 
               <q-banner
                 v-if="error"
@@ -94,18 +82,12 @@
                 :loading="loading"
               />
 
-              <div class="form__divider">
-                <span>o continúa con</span>
+              <div class="form__hint">
+                <span class="form__hint-label">Demo:</span>
+                <button type="button" class="form__hint-btn" @click="fillDemo('cliente@email.com', 'Cliente123')">Cliente</button>
+                <button type="button" class="form__hint-btn" @click="fillDemo('ana@email.com', 'Trabajador123')">Trabajador</button>
+                <button type="button" class="form__hint-btn" @click="fillDemo('admin@cleanly.com', 'Admin123')">Admin</button>
               </div>
-
-              <q-btn
-                outline
-                no-caps
-                color="primary"
-                icon="img:https://www.google.com/favicon.ico"
-                label="Google"
-                class="form__oauth"
-              />
             </q-form>
 
             <footer class="card__footer">
@@ -123,28 +105,32 @@
 
 <script setup lang="ts">
 import { reactive, ref } from 'vue';
-import { RouterLink, useRouter } from 'vue-router';
+import { RouterLink } from 'vue-router';
+import { useAuth } from '@/composables/useAuth';
 
-const router = useRouter();
+const { login } = useAuth();
 
 const form = reactive({
-  correo: '',
-  contrasena: '',
-  recordar: false,
+  email: '',
+  password: '',
 });
 
 const showPassword = ref(false);
 const loading = ref(false);
 const error = ref<string | null>(null);
 
+function fillDemo(email: string, password: string) {
+  form.email = email;
+  form.password = password;
+}
+
 async function onSubmit() {
   error.value = null;
   loading.value = true;
   try {
-    await new Promise((resolve) => setTimeout(resolve, 600));
-    router.push('/');
-  } catch {
-    error.value = 'No pudimos iniciar sesión. Verifica tus credenciales.';
+    await login(form.email, form.password);
+  } catch (e: any) {
+    error.value = e.message || 'Error al iniciar sesión';
   } finally {
     loading.value = false;
   }
@@ -172,7 +158,6 @@ async function onSubmit() {
     linear-gradient(90deg, rgba(13, 110, 110, 0.04) 1px, transparent 1px);
   background-size: 40px 40px;
   mask-image: radial-gradient(ellipse at top, black, transparent 70%);
-  -webkit-mask-image: radial-gradient(ellipse at top, black, transparent 70%);
   pointer-events: none;
 }
 .auth__blob {
@@ -209,6 +194,13 @@ async function onSubmit() {
 }
 .auth__brand {
   display: inline-flex;
+  text-decoration: none;
+}
+.auth__logo-text {
+  font-family: var(--font-display);
+  font-size: var(--text-2xl);
+  color: var(--color-primary);
+  margin: 0;
 }
 
 .card {
@@ -242,21 +234,6 @@ async function onSubmit() {
   flex-direction: column;
   gap: var(--space-4);
 }
-.form__row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-top: -4px;
-}
-.form__link {
-  font-size: var(--text-sm);
-  font-weight: var(--weight-semibold);
-  color: var(--color-primary);
-}
-.form__link:hover {
-  color: var(--color-primary-hover);
-  text-decoration: underline;
-}
 .form__banner {
   background: var(--color-error-bg);
   color: var(--color-error-text);
@@ -268,27 +245,32 @@ async function onSubmit() {
   border-radius: var(--radius-md);
   box-shadow: 0 4px 14px rgba(13, 110, 110, 0.25);
 }
-.form__divider {
+.form__hint {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
-  color: var(--color-text-tertiary);
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  justify-content: center;
   font-size: var(--text-xs);
-  text-transform: uppercase;
-  letter-spacing: var(--tracking-wide);
-  font-weight: var(--weight-semibold);
-  margin: var(--space-2) 0;
 }
-.form__divider::before,
-.form__divider::after {
-  content: '';
-  flex: 1;
-  height: 1px;
-  background: var(--color-border);
-}
-.form__oauth {
-  border-radius: var(--radius-md);
+.form__hint-label {
+  color: var(--color-text-tertiary);
   font-weight: var(--weight-semibold);
+}
+.form__hint-btn {
+  background: var(--color-primary-light);
+  color: var(--color-primary-dark);
+  border: 1px solid var(--color-primary);
+  border-radius: var(--radius-sm);
+  padding: 2px var(--space-2);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  cursor: pointer;
+  transition: background var(--duration-fast);
+}
+.form__hint-btn:hover {
+  background: var(--color-primary);
+  color: white;
 }
 
 .card__footer {
@@ -310,9 +292,6 @@ async function onSubmit() {
   .card {
     padding: var(--space-8) var(--space-6);
     border-radius: var(--radius-xl);
-  }
-  .card__title {
-    font-size: var(--text-xl);
   }
 }
 </style>

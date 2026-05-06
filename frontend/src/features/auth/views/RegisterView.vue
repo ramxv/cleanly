@@ -8,7 +8,7 @@
 
         <div class="auth__shell">
           <RouterLink to="/" class="auth__brand" aria-label="Cleanly">
-            <img src="/logo.svg" alt="Cleanly" height="32" />
+            <h1 class="auth__logo-text">✨ Cleanly</h1>
           </RouterLink>
 
           <div class="card">
@@ -45,7 +45,7 @@
               />
 
               <q-input
-                v-model="form.correo"
+                v-model="form.email"
                 type="email"
                 label="Correo electrónico"
                 stack-label
@@ -75,7 +75,7 @@
               />
 
               <q-input
-                v-model="form.contrasena"
+                v-model="form.password"
                 :type="showPassword ? 'text' : 'password'"
                 label="Contraseña"
                 stack-label
@@ -110,7 +110,7 @@
                 autocomplete="new-password"
                 :rules="[
                   (v) => !!v || 'Confirma la contraseña',
-                  (v) => v === form.contrasena || 'Las contraseñas no coinciden',
+                  (v) => v === form.password || 'Las contraseñas no coinciden',
                 ]"
                 lazy-rules
               />
@@ -123,13 +123,9 @@
               >
                 <span class="form__terms-text">
                   Acepto los
-                  <RouterLink to="/terminos" class="form__link">
-                    Términos
-                  </RouterLink>
+                  <RouterLink to="/terminos" class="form__link">Términos</RouterLink>
                   y la
-                  <RouterLink to="/privacidad" class="form__link">
-                    Política de Privacidad
-                  </RouterLink>
+                  <RouterLink to="/privacidad" class="form__link">Política de Privacidad</RouterLink>
                 </span>
               </q-checkbox>
 
@@ -159,9 +155,7 @@
 
             <footer class="card__footer">
               ¿Ya tienes cuenta?
-              <RouterLink to="/login" class="card__footer-link">
-                Iniciar sesión
-              </RouterLink>
+              <RouterLink to="/login" class="card__footer-link">Iniciar sesión</RouterLink>
             </footer>
           </div>
         </div>
@@ -172,25 +166,25 @@
 
 <script setup lang="ts">
 import { reactive, ref } from 'vue';
-import { RouterLink, useRouter } from 'vue-router';
+import { RouterLink } from 'vue-router';
+import type { UserRole } from '@/utils/types';
+import { useAuth } from '@/composables/useAuth';
 
-type Rol = 'CLIENTE' | 'TRABAJADOR';
-
-const router = useRouter();
+const { register } = useAuth();
 
 const form = reactive({
-  rol: 'CLIENTE' as Rol,
+  rol: 'client' as UserRole,
   nombre: '',
-  correo: '',
+  email: '',
   telefono: '',
-  contrasena: '',
+  password: '',
   confirmar: '',
   terminos: false,
 });
 
-const roleOptions: { value: Rol; label: string; icon: string }[] = [
-  { value: 'CLIENTE', label: 'Soy cliente', icon: 'home' },
-  { value: 'TRABAJADOR', label: 'Soy trabajador', icon: 'cleaning_services' },
+const roleOptions: { value: UserRole; label: string; icon: string }[] = [
+  { value: 'client', label: 'Soy cliente', icon: 'home' },
+  { value: 'worker', label: 'Soy trabajador', icon: 'cleaning_services' },
 ];
 
 const showPassword = ref(false);
@@ -201,10 +195,15 @@ async function onSubmit() {
   error.value = null;
   loading.value = true;
   try {
-    await new Promise((resolve) => setTimeout(resolve, 600));
-    router.push('/login');
-  } catch {
-    error.value = 'No pudimos crear tu cuenta. Inténtalo de nuevo.';
+    await register({
+      nombre: form.nombre,
+      email: form.email,
+      telefono: form.telefono,
+      password: form.password,
+      rol: form.rol,
+    });
+  } catch (e: any) {
+    error.value = e.message || 'Error al crear la cuenta';
   } finally {
     loading.value = false;
   }
@@ -232,7 +231,6 @@ async function onSubmit() {
     linear-gradient(90deg, rgba(13, 110, 110, 0.04) 1px, transparent 1px);
   background-size: 40px 40px;
   mask-image: radial-gradient(ellipse at top, black, transparent 70%);
-  -webkit-mask-image: radial-gradient(ellipse at top, black, transparent 70%);
   pointer-events: none;
 }
 .auth__blob {
@@ -269,6 +267,13 @@ async function onSubmit() {
 }
 .auth__brand {
   display: inline-flex;
+  text-decoration: none;
+}
+.auth__logo-text {
+  font-family: var(--font-display);
+  font-size: var(--text-xl);
+  color: var(--color-primary);
+  margin: 0;
 }
 
 .card {
@@ -317,6 +322,7 @@ async function onSubmit() {
   font-family: inherit;
   font-size: var(--text-sm);
   font-weight: var(--weight-semibold);
+  cursor: pointer;
 }
 .role__option:hover {
   border-color: var(--color-border-strong);
